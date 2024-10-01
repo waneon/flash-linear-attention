@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2024, Songlin Yang, Yu Zhang
 
 from __future__ import annotations
 
@@ -61,7 +62,7 @@ class MultiScaleRetention(nn.Module):
 
     def __init__(
         self,
-        mode: str = 'fused_chunk',
+        mode: str = 'chunk',
         hidden_size: int = 1024,
         expand_k: float = 1.0,
         expand_v: float = 2.0,
@@ -183,14 +184,16 @@ class MultiScaleRetention(nn.Module):
         if self.feature_map_fn is not None:
             q, k = map(self.feature_map_fn, (q, k))
 
-        seqlen_offset, max_seqlen = 0, None
+        seqlen_offset, max_seqlen = 0, q.shape[1]
         if past_key_values is not None:
             seqlen_offset = past_key_values.get_seq_length(self.layer_idx)
             max_seqlen = q.shape[1] + seqlen_offset
-        if attention_mask is not None:
-            # to deliminate the offsets of padding tokens
-            seqlen_offset = seqlen_offset + attention_mask.sum(-1) - attention_mask.shape[-1]
-            max_seqlen = q.shape[1] + max(seqlen_offset)
+
+            if attention_mask is not None:
+                # to deliminate the offsets of padding tokens
+                seqlen_offset = (seqlen_offset + attention_mask.sum(-1) - attention_mask.shape[-1]).clamp(min=0)
+                max_seqlen = q.shape[1] + max(seqlen_offset)
+
         q, k = self.rotary(q, k, seqlen_offset, max_seqlen)
         q = q.transpose(1, 2)
         if self.num_kv_groups > 1:
@@ -239,8 +242,8 @@ class MultiScaleRetention(nn.Module):
         state = tuple()
         if self.use_short_conv:
             state += (param.new_zeros(batch_size, self.key_dim, self.conv_size),
-                          param.new_zeros(batch_size, self.key_dim, self.conv_size),
-                          param.new_zeros(batch_size, self.value_dim, self.conv_size))
+                      param.new_zeros(batch_size, self.key_dim, self.conv_size),
+                      param.new_zeros(batch_size, self.value_dim, self.conv_size))
         state += (param.new_zeros(batch_size, self.num_heads, self.head_qk_dim, self.head_v_dim),)
         return state
 

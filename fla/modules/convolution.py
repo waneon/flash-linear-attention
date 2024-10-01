@@ -89,12 +89,14 @@ class ShortConvolution(nn.Conv1d):
         activation: Optional[str] = 'silu',
         use_fast_conv1d: Optional[bool] = True
     ):
-        super().__init__(in_channels=hidden_size,
-                         out_channels=hidden_size,
-                         kernel_size=kernel_size,
-                         groups=hidden_size,
-                         bias=bias,
-                         padding=kernel_size - 1)
+        super().__init__(
+            in_channels=hidden_size,
+            out_channels=hidden_size,
+            kernel_size=kernel_size,
+            groups=hidden_size,
+            bias=bias,
+            padding=kernel_size - 1
+        )
 
         self.hidden_size = hidden_size
         self.activation = None
@@ -111,7 +113,8 @@ class ShortConvolution(nn.Conv1d):
             else:
                 warnings.warn(
                     "The naive Pytorch verison is very slow in practice, "
-                    "please run `pip install causal-conv1d>=1.4.0` to install fast causal short convolution CUDA kernel"
+                    "please run `pip install causal-conv1d>=1.4.0` to install fast causal short convolution CUDA kernel",
+                    category=ImportWarning
                 )
         self.use_fast_conv1d = use_fast_conv1d
 
@@ -132,8 +135,8 @@ class ShortConvolution(nn.Conv1d):
             s += ', padding_mode={padding_mode}'
         if self.activation is not None:
             s += ', activation={activation}'
-        if not self.use_causal_conv:
-            s += ', use_causal_conv={use_causal_conv}'
+        if not self.use_fast_conv1d:
+            s += ', use_fast_conv1d={use_fast_conv1d}'
         return s.format(**self.__dict__)
 
     def forward(

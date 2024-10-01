@@ -40,7 +40,7 @@ def benchmark(T, provider):
     device = 'cuda'
     dtype = torch.bfloat16
     requires_grad = True
-    B, H, D, n_slots = 16, 8, 128, 64
+    B, H, D, M = 16, 4, 128, 64
 
     q = torch.randn(B, H, T, D, device=device, requires_grad=requires_grad, dtype=dtype)
     k = torch.randn(B, H, T, D, device=device, requires_grad=requires_grad, dtype=dtype)
@@ -53,7 +53,7 @@ def benchmark(T, provider):
         g = F.logsigmoid(torch.randn(B, H, T, D, device=device, dtype=dtype))
         g = g.clamp_min(-5).requires_grad_(requires_grad)
     if provider.startswith('abc'):
-        s = torch.randn(B, H, T, n_slots, device=device, requires_grad=requires_grad, dtype=dtype)
+        s = torch.randn(B, H, T, M, device=device, requires_grad=requires_grad, dtype=dtype)
 
     do = torch.ones_like(v, dtype=dtype)
 
@@ -63,11 +63,11 @@ def benchmark(T, provider):
     elif provider == 'gla':
         results = triton.testing.do_bench(lambda: chunk_gla(q, k, v, g), quantiles=quantiles)
     elif provider == 'abc_bwd':
-        results = triton.testing.do_bench(lambda: chunk_abc(q, k, v, s).backward(do), quantiles=quantiles)
+        results = triton.testing.do_bench(lambda: chunk_abc(q, k, v, s)[0].backward(do), quantiles=quantiles)
     elif provider == 'gla_bwd':
-        results = triton.testing.do_bench(lambda: chunk_gla(q, k, v, g).backward(do), quantiles=quantiles)
+        results = triton.testing.do_bench(lambda: chunk_gla(q, k, v, g)[0].backward(do), quantiles=quantiles)
     elif provider == 'retention_bwd':
-        results = triton.testing.do_bench(lambda: chunk_retention(q, k, v).backward(do), quantiles=quantiles)
+        results = triton.testing.do_bench(lambda: chunk_retention(q, k, v)[0].backward(do), quantiles=quantiles)
     elif provider == 'flash_bwd':
         results = triton.testing.do_bench(lambda: flash_attn_func(q, k, v, causal=True).backward(do), quantiles=quantiles)
     return results
